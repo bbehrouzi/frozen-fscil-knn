@@ -14,10 +14,11 @@ def fine_tune(
     encoder: Encoder,
     train_df: pd.DataFrame,
     seed: int = 42,
-    num_iterations: int = 20,
+    num_iterations: int = 3,
     num_epochs: int = 1,
     batch_size: int = 16,
     learning_rate: float = 2e-5,
+    max_steps: int = 500,
 ) -> None:
 
     def model_init():
@@ -37,6 +38,7 @@ def fine_tune(
         num_epochs=num_epochs,
         batch_size=batch_size,
         body_learning_rate=learning_rate,
+        max_steps=max_steps,
         seed=seed,
     )
 
@@ -69,10 +71,11 @@ def optimize_hyperparameters(
             trial_encoder,
             base_train_df,
             seed=seed,
-            num_iterations=trial.suggest_int("num_iterations", 5, 40),
+            num_iterations=trial.suggest_int("num_iterations", 1, 5),
             num_epochs=trial.suggest_int("num_epochs", 1, 5),
             batch_size=trial.suggest_categorical("batch_size", [8, 16, 32]),
             learning_rate=trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
+            max_steps=trial.suggest_int("max_steps", 250, 2000),
         )
 
         train_emb = trial_encoder.embed(base_train_df[TEXT_COL].tolist())
@@ -81,7 +84,7 @@ def optimize_hyperparameters(
         clf = KNNClassifier()
         clf.fit(train_emb, base_train_df[LABEL_COL].to_numpy())
         preds = clf.predict(val_emb)
-        score = f1_score(base_val_df[LABEL_COL].to_numpy(), preds, average="macro")
+        score = f1_score(base_val_df[LABEL_COL].to_numpy(), preds, average="macro", zero_division=0)
         print(f"Trial {trial.number + 1} macro-F1: {score:.4f}")
         return score
 

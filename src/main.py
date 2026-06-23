@@ -18,9 +18,9 @@ def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
     output_dir = output_dir / dataset_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    base_df, _ = split_base_novel(df, base_portion=0.6, random_state=SEED)
+    base_df, _ = split_base_novel(df, random_state=SEED)
     base_train_df, base_val_df, _ = split_train_val_test(
-        base_df, val_size=0.1, test_size=0.2, random_state=SEED
+        base_df, random_state=SEED
     )
 
     encoder = Encoder(MODEL_NAME, MAX_SEQ_LENGTH)
