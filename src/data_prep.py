@@ -6,24 +6,21 @@ from ftfy import fix_text
 from lingua import Language, LanguageDetectorBuilder
 from transformers import AutoTokenizer
 from pathlib import Path
+from main import MODEL_NAME
 
 LANG_DETECTOR = LanguageDetectorBuilder.from_all_languages().build()
-ROOT_DIR = Path(__file__).resolve().parent.parent
-HR_DATA_PATH = ROOT_DIR / "data" / "Ankaadia" / "data_2025_10_26.csv"
-WOS_DATA_PATH = ROOT_DIR / "data" / "WebOfScience" / "WOS11967"
 TEXT_COL = "text"
 LABEL_COL = "label"
-TOKENIZER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 HR_LABEL_MERGE_MAP = {
     "DECOFEMPLYBEFORE": "DECOFEMPLY",
     "DECOFEMPLYAFTER": "DECOFEMPLY",
 }
 
 
-def load_hr_dataset(min_tokens_limit: int = 15, min_class_samples: int = 50, model_name: str = TOKENIZER_MODEL) -> pd.DataFrame:
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+def load_hr_dataset(data_path: Path, min_tokens_limit: int = 15, min_class_samples: int = 50) -> pd.DataFrame:
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
-    hr_df = pd.read_csv(HR_DATA_PATH)
+    hr_df = pd.read_csv(data_path)
 
     hr_df = hr_df[['content_en', 'label']].rename(columns={'content_en': TEXT_COL})
 
@@ -44,17 +41,17 @@ def load_hr_dataset(min_tokens_limit: int = 15, min_class_samples: int = 50, mod
     return hr_df
 
 
-def load_wos_dataset(min_class_samples: int = 50) -> pd.DataFrame:
-    with open(WOS_DATA_PATH / "X.txt", "r", encoding="utf-8") as f:
+def load_wos_dataset(data_path: Path, min_class_samples: int = 50) -> pd.DataFrame:
+    with open(data_path / "X.txt", "r", encoding="utf-8") as f:
         docs = [line.strip() for line in f.readlines()]
 
-    with open(WOS_DATA_PATH / "Y.txt", "r", encoding="utf-8") as f:
+    with open(data_path / "Y.txt", "r", encoding="utf-8") as f:
         label = [int(line.strip()) for line in f.readlines()]
         
-    with open(WOS_DATA_PATH / "YL1.txt", "r", encoding="utf-8") as f:
+    with open(data_path / "YL1.txt", "r", encoding="utf-8") as f:
         label_l1 = [int(line.strip()) for line in f.readlines()]
         
-    with open(WOS_DATA_PATH / "YL2.txt", "r", encoding="utf-8") as f:
+    with open(data_path / "YL2.txt", "r", encoding="utf-8") as f:
         label_l2 = [int(line.strip()) for line in f.readlines()]
 
     wos_df = pd.DataFrame(
