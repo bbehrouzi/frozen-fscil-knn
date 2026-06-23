@@ -1,12 +1,12 @@
-import pandas as pd
 import re
 import unicodedata
 
 from ftfy import fix_text
 from lingua import Language, LanguageDetectorBuilder
 from transformers import AutoTokenizer
+import pandas as pd
 from pathlib import Path
-from main import MODEL_NAME
+from encoder import MODEL_NAME
 
 LANG_DETECTOR = LanguageDetectorBuilder.from_all_languages().build()
 TEXT_COL = "text"

@@ -6,10 +6,10 @@ from pathlib import Path
 from encoder import Encoder
 from fine_tune import optimize_hyperparameters
 from data_prep import load_wos_dataset, load_hr_dataset
+from encoder import MODEL_NAME
 from data_split import split_base_novel, split_train_val_test
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 SEED = 42
 MAX_SEQ_LENGTH = 512
 
