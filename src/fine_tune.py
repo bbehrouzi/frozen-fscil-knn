@@ -84,7 +84,6 @@ def optimize_hyperparameters(
 
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="maximize", sampler=sampler)
-    study.enqueue_trial({"batch_size": 16, "learning_rate": 2e-5, "max_steps": -1})
     study.optimize(objective, n_trials=n_trials)
 
     return study
