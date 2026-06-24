@@ -43,7 +43,7 @@ def load_hr_dataset(data_path: Path, min_tokens_limit: int = 15, min_class_sampl
 
 def load_wos_dataset(data_path: Path, min_class_samples: int = 50) -> pd.DataFrame:
     with open(data_path / "X.txt", "r", encoding="utf-8") as f:
-        docs = [line.strip() for line in f.readlines()]
+        text = [line.strip() for line in f.readlines()]
 
     with open(data_path / "Y.txt", "r", encoding="utf-8") as f:
         label = [int(line.strip()) for line in f.readlines()]
@@ -56,7 +56,7 @@ def load_wos_dataset(data_path: Path, min_class_samples: int = 50) -> pd.DataFra
 
     wos_df = pd.DataFrame(
         {
-            TEXT_COL: docs,
+            TEXT_COL: text,
             LABEL_COL: label,
             f"{LABEL_COL}_l1": label_l1,
             f"{LABEL_COL}_l2": label_l2,

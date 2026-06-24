@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 from encoder import Encoder
 from fine_tune import optimize_hyperparameters
-from data_prep import load_wos_dataset, load_hr_dataset
+from data_prep import load_wos_dataset, load_hr_dataset, build_wos_label_map
 from encoder import MODEL_NAME
 from data_split import split_base_novel, split_train_val_test
 
@@ -24,7 +24,7 @@ def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
     )
 
     base_classes = sorted(base_df["label"].unique())
-    print(f"[{dataset_name}] Base classes ({len(base_classes)}): {', '.join(base_classes)}")
+    print(f"[{dataset_name}] Base classes ({len(base_classes)}): {', '.join(str(c) for c in base_classes)}")
 
     encoder = Encoder(MODEL_NAME, MAX_SEQ_LENGTH)
 
