@@ -23,6 +23,9 @@ def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
         base_df, random_state=SEED
     )
 
+    base_classes = sorted(base_df["label"].unique())
+    print(f"[{dataset_name}] Base classes ({len(base_classes)}): {', '.join(base_classes)}")
+
     encoder = Encoder(MODEL_NAME, MAX_SEQ_LENGTH)
 
     study = optimize_hyperparameters(
@@ -38,8 +41,12 @@ def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
 
     best_params = study.best_params
     with open(output_dir / "hpo_best_params.json", "w") as f:
-        json.dump(best_params, f, indent=2)
-    print(f"[{dataset_name}] Best params (macro-F1 {study.best_value:.4f}): {best_params}")
+        json.dump({
+            "seed": SEED,
+            "base_classes": base_classes,
+            "best_params": best_params,
+            "best_value": study.best_value,
+        }, f, indent=2)
 
 
 def main() -> None:

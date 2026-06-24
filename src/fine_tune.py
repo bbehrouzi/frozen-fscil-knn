@@ -14,8 +14,6 @@ def fine_tune(
     encoder: Encoder,
     train_df: pd.DataFrame,
     seed: int = 42,
-    num_iterations: int = 3,
-    num_epochs: int = 1,
     batch_size: int = 16,
     learning_rate: float = 2e-5,
     max_steps: int = 500,
@@ -34,8 +32,6 @@ def fine_tune(
     )
 
     args = TrainingArguments(
-        num_iterations=num_iterations,
-        num_epochs=num_epochs,
         batch_size=batch_size,
         body_learning_rate=learning_rate,
         max_steps=max_steps,
@@ -59,7 +55,7 @@ def optimize_hyperparameters(
     encoder: Encoder,
     base_train_df: pd.DataFrame,
     base_val_df: pd.DataFrame,
-    n_trials: int = 10,
+    n_trials: int = 15,
     seed: int = 42,
 ) -> optuna.Study:
     
@@ -71,11 +67,9 @@ def optimize_hyperparameters(
             trial_encoder,
             base_train_df,
             seed=seed,
-            num_iterations=trial.suggest_int("num_iterations", 1, 5),
-            num_epochs=trial.suggest_int("num_epochs", 1, 5),
-            batch_size=trial.suggest_categorical("batch_size", [8, 16, 32]),
+            batch_size=trial.suggest_categorical("batch_size", [8, 16, 32, 64]),
             learning_rate=trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
-            max_steps=trial.suggest_int("max_steps", 250, 2000),
+            max_steps=trial.suggest_int("max_steps", 250, 2500),
         )
 
         train_emb = trial_encoder.embed(base_train_df[TEXT_COL].tolist())
@@ -90,6 +84,7 @@ def optimize_hyperparameters(
 
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="maximize", sampler=sampler)
+    study.enqueue_trial({"batch_size": 16, "learning_rate": 2e-5, "max_steps": -1})
     study.optimize(objective, n_trials=n_trials)
 
     return study
