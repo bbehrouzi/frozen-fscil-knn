@@ -23,7 +23,7 @@ def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
         base_df, random_state=SEED
     )
 
-    base_classes = sorted(base_df["label"].unique())
+    base_classes = sorted(base_df["label"].unique().tolist())
     print(f"[{dataset_name}] Base classes ({len(base_classes)}): {', '.join(str(c) for c in base_classes)}")
 
     encoder = Encoder(MODEL_NAME, MAX_SEQ_LENGTH)
