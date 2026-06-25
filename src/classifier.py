@@ -18,6 +18,3 @@ class KNNClassifier:
 
     def predict(self, embeddings: np.ndarray) -> np.ndarray:
         return self._clf.predict(embeddings)
-
-    def predict_proba(self, embeddings: np.ndarray) -> np.ndarray:
-        return self._clf.predict_proba(embeddings)

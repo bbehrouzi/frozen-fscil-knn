@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 import pandas as pd
 import optuna
 
@@ -13,15 +15,15 @@ from data_prep import TEXT_COL, LABEL_COL
 def fine_tune(
     encoder: Encoder,
     train_df: pd.DataFrame,
-    seed: int = 42,
-    batch_size: int = 16,
-    learning_rate: float = 2e-5,
-    max_steps: int = 500,
+    seed: int,
+    batch_size: int,
+    learning_rate: float,
+    max_steps: int,
 ) -> None:
 
     def model_init():
         m = SetFitModel.from_pretrained(encoder.model_name)
-        m.model_body.max_seq_length = 512
+        m.model_body.max_seq_length = encoder.model.max_seq_length
         return m
 
     train_dataset = Dataset.from_dict(
@@ -87,3 +89,13 @@ def optimize_hyperparameters(
     study.optimize(objective, n_trials=n_trials)
 
     return study
+
+
+def load_best_params(path: Path) -> dict:
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"No HPO results found at '{path}'. Run with --mode hpo first."
+        )
+    with open(path, "r") as f:
+        data = json.load(f)
+    return data["best_params"]
