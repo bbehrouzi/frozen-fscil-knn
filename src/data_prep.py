@@ -30,7 +30,7 @@ def load_hr_dataset(data_path: Path, min_tokens_limit: int = 15, min_class_sampl
 
     hr_df = hr_df[hr_df[TEXT_COL].apply(_is_english)]
 
-    hr_df = hr_df[~hr_df[TEXT_COL].apply(_too_short(tokenizer, min_tokens_limit))]
+    hr_df = hr_df[~hr_df[TEXT_COL].apply(lambda text: _too_short(text, tokenizer, min_tokens_limit))]
 
     hr_df[LABEL_COL] = hr_df[LABEL_COL].replace(HR_LABEL_MERGE_MAP)
 
