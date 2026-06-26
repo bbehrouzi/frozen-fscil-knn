@@ -3,10 +3,12 @@ import json
 import pandas as pd
 
 from pathlib import Path
+from classifier import KNNClassifier
 from encoder import Encoder
-from fine_tune import optimize_hyperparameters, fine_tune, load_best_params
-from data_prep import load_wos_dataset, load_hr_dataset
+from fine_tune import optimize_hyperparameters, fine_tune
+from data_prep import load_wos_dataset, load_hr_dataset, TEXT_COL, LABEL_COL
 from data_split import split_base_novel, split_train_val_test
+from sklearn.metrics import f1_score
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SEED = 42
@@ -52,19 +54,43 @@ def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
 
 def run_fine_tune(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
     params_path = output_dir / dataset_name / "hpo_best_params.json"
-    best_params = load_best_params(params_path)
-    print(f"[{dataset_name}] Loaded best params: {best_params}")
+    hpo_results = _load_hpo_results(params_path)
+
+    print(f"[{dataset_name}] Loaded best params: {hpo_results['best_params']}")
 
     base_df, _ = split_base_novel(df, random_state=SEED)
-    base_train_df, _, _ = split_train_val_test(base_df, random_state=SEED)
+    base_train_df, base_val_df, _ = split_train_val_test(base_df, random_state=SEED)
 
     encoder = Encoder()
-    fine_tune(encoder, base_train_df, seed=SEED, **best_params)
+    fine_tune(encoder, base_train_df, seed=SEED, **hpo_results['best_params'])
     print(f"[{dataset_name}] Fine-tuning complete.")
 
     model_path = output_dir / dataset_name / "fine_tuned_encoder"
     encoder.save_model(str(model_path))
     print(f"[{dataset_name}] Encoder saved to {model_path}")
+
+    if hpo_results["seed"] == SEED:
+        train_emb = encoder.embed(base_train_df[TEXT_COL].tolist())
+        val_emb = encoder.embed(base_val_df[TEXT_COL].tolist())
+
+        clf = KNNClassifier()
+        clf.fit(train_emb, base_train_df[LABEL_COL].to_numpy())
+        preds = clf.predict(val_emb)
+        score = f1_score(base_val_df[LABEL_COL].to_numpy(), preds, average="macro", zero_division=0)
+        print(f"[{dataset_name}] Macro-F1: {score:.4f}")
+
+        if hpo_results["best_value"] != score:
+            print(f"Macro-F1 does not match expected value of hpo run: {hpo_results["best_value"]:.4f}")
+
+
+def _load_hpo_results(path: Path) -> dict:
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"No HPO results found at '{path}'. Run with --mode hpo first."
+        )
+    with open(path, "r") as f:
+        data = json.load(f)
+    return data
 
 
 def main() -> None:

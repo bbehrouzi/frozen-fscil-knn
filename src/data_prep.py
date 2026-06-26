@@ -18,6 +18,8 @@ HR_LABEL_MERGE_MAP = {
 
 
 def load_hr_dataset(data_path: Path, min_tokens_limit: int = 15, min_class_samples: int = 50) -> pd.DataFrame:
+    print(f"Loading dataset from {data_path}")
+    
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
     hr_df = pd.read_csv(data_path)
@@ -42,6 +44,8 @@ def load_hr_dataset(data_path: Path, min_tokens_limit: int = 15, min_class_sampl
 
 
 def load_wos_dataset(data_path: Path, min_class_samples: int = 50) -> pd.DataFrame:
+    print(f"Loading dataset from {data_path}")
+
     with open(data_path / "X.txt", "r", encoding="utf-8") as f:
         text = [line.strip() for line in f.readlines()]
 

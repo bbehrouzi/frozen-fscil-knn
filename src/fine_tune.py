@@ -89,13 +89,3 @@ def optimize_hyperparameters(
     study.optimize(objective, n_trials=n_trials)
 
     return study
-
-
-def load_best_params(path: Path) -> dict:
-    if not Path(path).exists():
-        raise FileNotFoundError(
-            f"No HPO results found at '{path}'. Run with --mode hpo first."
-        )
-    with open(path, "r") as f:
-        data = json.load(f)
-    return data["best_params"]
