@@ -143,7 +143,11 @@ def load_config(path: Path) -> Config:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=Path, help="Path to config JSON file")
-    cfg = load_config(parser.parse_args().config)
+    parser.add_argument("--data-path", type=Path, default=None, help="Override data_path from config")
+    args = parser.parse_args()
+    cfg = load_config(args.config)
+    if args.data_path is not None:
+        cfg.data_path = args.data_path
 
     cfg.output_dir.mkdir(parents=True, exist_ok=True)
 
