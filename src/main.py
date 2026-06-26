@@ -1,89 +1,119 @@
 import argparse
 import json
+import numpy as np
 import pandas as pd
 
+from dataclasses import dataclass
 from pathlib import Path
-from classifier import KNNClassifier
 from encoder import Encoder
-from fine_tune import optimize_hyperparameters, fine_tune
-from data_prep import load_wos_dataset, load_hr_dataset, TEXT_COL, LABEL_COL
-from data_split import split_base_novel, split_train_val_test
-from sklearn.metrics import f1_score
+from fine_tune import hp_optimization, fine_tune
+from experiment import experiment
+from data_prep import load_wos_dataset, load_hr_dataset
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-SEED = 42
 HR = "HumanResources"
 WOS = "WebOfScience"
 
 
-def run_hpo(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:  
+@dataclass
+class Config:
+    mode: str
+    data_path: Path
+    output_dir: Path
+    seeds: list[int]
+    n_shots: int
+    k_neighbors: int
+    n_novel_classes: int
+    base_size: float
+
+
+def run_hp_optimization(dataset_name: str, df: pd.DataFrame, output_dir: Path, cfg: Config):  
     output_dir = output_dir / dataset_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    base_df, _ = split_base_novel(df, random_state=SEED)
-    base_train_df, base_val_df, _ = split_train_val_test(
-        base_df, random_state=SEED
-    )
-
-    base_classes = sorted(base_df["label"].unique().tolist())
-    print(f"[{dataset_name}] Base classes ({len(base_classes)}): {', '.join(str(c) for c in base_classes)}")
-
-    encoder = Encoder()
-
-    study = optimize_hyperparameters(
-        encoder,
-        base_train_df,
-        base_val_df,
-        seed=SEED,
+    study, base_classes = hp_optimization(
+        df,
+        seed=cfg.seeds[0],
     )
 
     trials_df = study.trials_dataframe()
     trials_df.to_csv(output_dir / "hpo_trials.csv", index=False)
     print(f"[{dataset_name}] All trials saved to {output_dir / 'hpo_trials.csv'}")
 
-    best_params = study.best_params
-    with open(output_dir / "hpo_best_params.json", "w") as f:
+    with open(output_dir / "hpo_summary.json", "w") as f:
         json.dump({
-            "seed": SEED,
+            "seed": cfg.seeds[0],
             "base_classes": base_classes,
-            "best_params": best_params,
+            "best_params": study.best_params,
             "best_value": study.best_value,
         }, f, indent=2)
-    print(f"[{dataset_name}] Best hyperparameters saved to {output_dir / 'hpo_best_params.json'}")
+    print(f"[{dataset_name}] Best hyperparameters saved to {output_dir / 'hpo_summary.json'}")
 
 
-def run_fine_tune(dataset_name: str, df: pd.DataFrame, output_dir: Path) -> None:
-    params_path = output_dir / dataset_name / "hpo_best_params.json"
-    hpo_results = _load_hpo_results(params_path)
+def run_fine_tune(dataset_name: str, df: pd.DataFrame, output_dir: Path, cfg: Config):
+    hpo_summary = load_hpo_summary(output_dir / dataset_name / "hpo_summary.json")
+    print(f"[{dataset_name}] Loaded best params: {hpo_summary['best_params']}")
 
-    print(f"[{dataset_name}] Loaded best params: {hpo_results['best_params']}")
-
-    base_df, _ = split_base_novel(df, random_state=SEED)
-    base_train_df, base_val_df, _ = split_train_val_test(base_df, random_state=SEED)
-
-    encoder = Encoder()
-    fine_tune(encoder, base_train_df, seed=SEED, **hpo_results['best_params'])
-    print(f"[{dataset_name}] Fine-tuning complete.")
-
-    model_path = output_dir / dataset_name / "fine_tuned_encoder"
-    encoder.save_model(str(model_path))
-    print(f"[{dataset_name}] Encoder saved to {model_path}")
-
-    if hpo_results["seed"] == SEED:
-        train_emb = encoder.embed(base_train_df[TEXT_COL].tolist())
-        val_emb = encoder.embed(base_val_df[TEXT_COL].tolist())
-
-        clf = KNNClassifier()
-        clf.fit(train_emb, base_train_df[LABEL_COL].to_numpy())
-        preds = clf.predict(val_emb)
-        score = f1_score(base_val_df[LABEL_COL].to_numpy(), preds, average="macro", zero_division=0)
-        print(f"[{dataset_name}] Macro-F1: {score:.4f}")
-
-        if hpo_results["best_value"] != score:
-            print(f"Macro-F1 does not match expected value of hpo run: {hpo_results["best_value"]:.4f}")
+    for seed in cfg.seeds:
+        encoder = Encoder()
+        fine_tune(encoder, df, seed=seed, **hpo_summary['best_params'])
+        model_path = output_dir / dataset_name / f"seed_{seed}" / "fine_tuned_encoder"
+        model_path.mkdir(parents=True, exist_ok=True)
+        encoder.save_model(str(model_path))
+        print(f"[{dataset_name}] seed={seed}: encoder saved to {model_path}")
 
 
-def _load_hpo_results(path: Path) -> dict:
+def run_experiment(dataset_name: str, df: pd.DataFrame, output_dir: Path, cfg: Config):
+    all_results = []
+
+    for seed in cfg.seeds:
+        encoder_path = output_dir / dataset_name / f"seed_{seed}" / "fine_tuned_encoder"
+        encoder = Encoder()
+        if encoder_path.exists():
+            encoder.load_model(encoder_path)
+            print(f"[{dataset_name}] seed={seed}: loaded fine-tuned encoder from {encoder_path}")
+        else:
+            print(f"[{dataset_name}] seed={seed}: no fine-tuned encoder found, using pre-trained encoder")
+
+        result = experiment(
+            encoder,
+            df,
+            n_shots=cfg.n_shots,
+            k_neighbors=cfg.k_neighbors,
+            n_novel_classes=cfg.n_novel_classes,
+            base_size=cfg.base_size,
+            seed=seed,
+        )
+        all_results.append(result)
+
+        seed_dir = output_dir / dataset_name / f"seed_{seed}"
+        seed_dir.mkdir(parents=True, exist_ok=True)
+        sessions_df = pd.DataFrame([s.__dict__ for s in result.sessions])
+        sessions_df.to_csv(seed_dir / "eval_sessions.csv", index=False)
+        with open(seed_dir / "eval_summary.json", "w") as f:
+            json.dump({
+                "f_bar": result.f_bar,
+                "perf_drop": result.perf_drop,
+                "silhouette": result.silhouette,
+                "dbi": result.dbi,
+            }, f, indent=2)
+        print(f"[{dataset_name}] seed={seed}: results saved to {seed_dir}")
+
+    # Average scalar metrics across seeds
+    eval_dir = output_dir / dataset_name
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    scalar_keys = ["f_bar", "perf_drop", "silhouette", "dbi"]
+    agg: dict = {"seeds": cfg.seeds}
+    for k in scalar_keys:
+        vals = [getattr(r, k) for r in all_results]
+        agg[f"{k}_mean"] = float(np.mean(vals))
+        agg[f"{k}_std"] = float(np.std(vals))
+    with open(eval_dir / "eval_summary.json", "w") as f:
+        json.dump(agg, f, indent=2)
+    print(f"[{dataset_name}] Aggregate metrics (mean +/- std over {len(cfg.seeds)} seeds): {agg}")
+
+
+def load_hpo_summary(path: Path) -> dict:
     if not Path(path).exists():
         raise FileNotFoundError(
             f"No HPO results found at '{path}'. Run with --mode hpo first."
@@ -93,29 +123,39 @@ def _load_hpo_results(path: Path) -> dict:
     return data
 
 
+def load_config(path: Path) -> Config:
+    with open(path) as f:
+        data = json.load(f)
+    raw = data.get("seeds", data.get("seed", 42))
+    seeds = raw if isinstance(raw, list) else [raw]
+    return Config(
+        mode=data["mode"],
+        data_path=Path(data["data_path"]),
+        output_dir=Path(data["output_dir"]),
+        seeds=seeds,
+        n_shots=data["n_shots"],
+        k_neighbors=data["k_neighbors"],
+        n_novel_classes=data["n_novel_classes"],
+        base_size=data["base_size"],
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--wos-path", type=Path)
-    parser.add_argument("--hr-path", type=Path)
-    parser.add_argument("--output-dir", type=Path, default=ROOT_DIR / "output")
-    parser.add_argument("--mode", choices=["hpo", "fine-tune"], default="fine-tune")
-    args = parser.parse_args()
+    parser.add_argument("config", type=Path, help="Path to config JSON file")
+    cfg = load_config(parser.parse_args().config)
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    cfg.output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.wos_path:
-        wos_df = load_wos_dataset(args.wos_path)
-        if args.mode == "hpo":
-            run_hpo(WOS, wos_df, args.output_dir)
-        else:
-            run_fine_tune(WOS, wos_df, args.output_dir)
+    name, loader = (HR, load_hr_dataset) if HR in str(cfg.data_path) else (WOS, load_wos_dataset)
+    df = loader(cfg.data_path)
 
-    if args.hr_path:
-        hr_df = load_hr_dataset(args.hr_path)
-        if args.mode == "hpo":
-            run_hpo(HR, hr_df, args.output_dir)
-        else:
-            run_fine_tune(HR, hr_df, args.output_dir)
+    if cfg.mode == "hp-optimization":
+        run_hp_optimization(name, df, cfg.output_dir, cfg)
+    elif cfg.mode == "fine-tune":
+        run_fine_tune(name, df, cfg.output_dir, cfg)
+    else:
+        run_experiment(name, df, cfg.output_dir, cfg)
 
 
 if __name__ == "__main__":

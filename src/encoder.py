@@ -7,7 +7,7 @@ MAX_SEQ_LENGTH = 512
 
 
 class Encoder:
-    def __init__(self) -> None:
+    def __init__(self):
         self.model_name = MODEL_NAME
         self.model = SentenceTransformer(MODEL_NAME)
         self.model.max_seq_length = MAX_SEQ_LENGTH
@@ -27,9 +27,12 @@ class Encoder:
 
         return np.stack([self._cache[t] for t in texts])
 
-    def update_model(self, new_model: SentenceTransformer) -> None:
+    def update_model(self, new_model: SentenceTransformer):
         self._cache.clear()
         self.model = new_model
 
-    def save_model(self, path: str) -> None:
+    def save_model(self, path: str):
         self.model.save(path)
+
+    def load_model(self, path: str):
+        self.model = SentenceTransformer(path)

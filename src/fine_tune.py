@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 import pandas as pd
 import optuna
 
@@ -8,28 +6,31 @@ from setfit import SetFitModel, Trainer, TrainingArguments
 from sklearn.metrics import f1_score
 
 from classifier import KNNClassifier
+from data_split import split_base_novel, split_train_val_test
 from encoder import Encoder
 from data_prep import TEXT_COL, LABEL_COL
 
 
 def fine_tune(
     encoder: Encoder,
-    train_df: pd.DataFrame,
+    df: pd.DataFrame,
     seed: int,
     batch_size: int,
     learning_rate: float,
     max_steps: int,
-) -> None:
-
+):
     def model_init():
         m = SetFitModel.from_pretrained(encoder.model_name)
         m.model_body.max_seq_length = encoder.model.max_seq_length
         return m
+    
+    base_df, _ = split_base_novel(df, random_state=seed)
+    base_train_df, _, _ = split_train_val_test(base_df, random_state=seed)
 
     train_dataset = Dataset.from_dict(
         {
-            TEXT_COL: train_df[TEXT_COL].tolist(),
-            LABEL_COL: train_df[LABEL_COL].tolist(),
+            TEXT_COL: base_train_df[TEXT_COL].tolist(),
+            LABEL_COL: base_train_df[LABEL_COL].tolist(),
         }
     )
 
@@ -53,21 +54,22 @@ def fine_tune(
     print("Encoder updated.")
 
 
-def optimize_hyperparameters(
-    encoder: Encoder,
-    base_train_df: pd.DataFrame,
-    base_val_df: pd.DataFrame,
+def hp_optimization(
+    df: pd.DataFrame,
     n_trials: int = 15,
     seed: int = 42,
-) -> optuna.Study:
+) -> tuple[optuna.Study, list]:
+    base_df, _ = split_base_novel(df, random_state=seed)
+    base_train_df, base_val_df, _ = split_train_val_test(base_df, random_state=seed)
+    base_classes = sorted(base_df[LABEL_COL].unique().tolist())
     
     def objective(trial: optuna.Trial) -> float:
         print(f"Starting trial {trial.number + 1}/{n_trials}...")
-        trial_encoder = Encoder(encoder.model_name, encoder.model.max_seq_length)
+        trial_encoder = Encoder()
 
         fine_tune(
             trial_encoder,
-            base_train_df,
+            df,
             seed=seed,
             batch_size=trial.suggest_categorical("batch_size", [8, 16, 32, 64]),
             learning_rate=trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
@@ -88,4 +90,4 @@ def optimize_hyperparameters(
     study = optuna.create_study(direction="maximize", sampler=sampler)
     study.optimize(objective, n_trials=n_trials)
 
-    return study
+    return study, base_classes
