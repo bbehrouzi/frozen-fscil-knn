@@ -1,0 +1,11 @@
+{
+  "mode": "evaluate",
+  "data_path": "data/HumanResources/data_2025_10_26.csv",
+  "output_dir": "output",
+  "seeds": [664, 4243, 6312, 6891, 8377],
+  "use_fine_tuned": false,
+  "n_shots": 5,
+  "k_neighbors": 5,
+  "base_size": 0.6,
+  "sweep": {"variable": "k_neighbors", "values": [1, 2, 3, 5, 10]}
+}

@@ -1,0 +1,11 @@
+{
+  "mode": "evaluate",
+  "data_path": "data/WebOfScience/WOS11967",
+  "output_dir": "output",
+  "seeds": [664, 4243, 6312, 6891, 8377],
+  "use_fine_tuned": false,
+  "n_shots": 5,
+  "k_neighbors": 5,
+  "base_size": 0.6,
+  "sweep": {"variable": "n_shots", "values": [1, 2, 3, 5, 10]}
+}

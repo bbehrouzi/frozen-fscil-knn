@@ -1,10 +1,9 @@
 {
-  "mode": "hp-optimization",
+  "mode": "fine-tune",
   "data_path": "data/WebOfScience/WOS11967",
   "output_dir": "output",
-  "seeds": [42],
+  "seeds": [664, 4243, 6312, 6891, 8377],
   "n_shots": 5,
   "k_neighbors": 5,
-  "base_size": 0.6,
-  "use_fine_tuned": false
+  "base_size": 0.6
 }

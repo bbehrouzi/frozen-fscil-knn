@@ -1,0 +1,9 @@
+{
+  "mode": "hp-optimization",
+  "data_path": "data/HumanResources/data_2025_10_26.csv",
+  "output_dir": "output",
+  "seeds": [42],
+  "n_shots": 5,
+  "k_neighbors": 5,
+  "base_size": 0.6
+}

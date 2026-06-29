@@ -19,9 +19,10 @@ class Session:
     f_base: float
     f_novel: float | None               # None for session 0
     base_to_novel_error: float | None   # None for session 0
+    novel_to_base_error: float | None   # None for session 0
     silhouette: float
     dbi: float
-    confusion: list[list[int]]
+    confusion_matrix: list[list[int]]
     confusion_labels: list
 
 
@@ -86,8 +87,8 @@ def experiment(
     cm0 = confusion_matrix(base_test_labels, base_preds_0, labels=base_classes).tolist()
 
     sessions: list[Session] = [
-        Session(session=0, f_macro=f0, f_base=f0, f_novel=None, base_to_novel_error=None,
-        silhouette=sil0, dbi=dbi0, confusion=cm0, confusion_labels=[str(l) for l in base_classes])
+        Session(session=0, f_macro=f0, f_base=f0, f_novel=None, base_to_novel_error=None, novel_to_base_error=None,
+        silhouette=sil0, dbi=dbi0, confusion_matrix=cm0, confusion_labels=[str(l) for l in base_classes])
     ]
 
     # --- Incremental sessions ---
@@ -129,9 +130,10 @@ def experiment(
             f_base=f1_score(base_test_labels, base_preds, average="macro", labels=base_classes, zero_division=0),
             f_novel=f1_score(novel_true, novel_preds, average="macro", labels=seen_novel, zero_division=0),
             base_to_novel_error=float(np.mean(np.isin(base_preds, seen_novel))),
+            novel_to_base_error=float(np.mean(np.isin(novel_preds, base_classes))),
             silhouette=silhouette,
             dbi=dbi,
-            confusion=cm,
+            confusion_matrix=cm,
             confusion_labels=[str(l) for l in session_labels],
         ))
 

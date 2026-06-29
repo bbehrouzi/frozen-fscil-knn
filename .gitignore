@@ -4,4 +4,4 @@ notebooks/output/
 .DS_Store
 __pycache__/
 checkpoints/
-fine_tuned_encoder/
+output/
