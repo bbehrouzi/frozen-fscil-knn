@@ -52,17 +52,12 @@ def split_train_val_test(
 
 
 def split_train_test(
-    df: pd.DataFrame,
-    n_shots: int = 5,
-    random_state: int = 42,
+        df: pd.DataFrame,
+        max_shots: int, 
+        n_shots: int = 5,
+        random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    train_idx = (
-        df.groupby(LABEL_COL, group_keys=False)
-        .apply(lambda g: g.sample(n=n_shots, random_state=random_state))
-        .index
-    )
-
-    train_df = df.loc[train_idx].reset_index(drop=True)
-    test_df = df.drop(index=train_idx).reset_index(drop=True)
-
+    pool = df.sample(n=max_shots, random_state=random_state)
+    test_df = df.drop(index=pool.index).reset_index(drop=True)
+    train_df = pool.head(n_shots).reset_index(drop=True)
     return train_df, test_df

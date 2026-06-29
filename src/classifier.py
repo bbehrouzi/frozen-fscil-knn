@@ -5,7 +5,6 @@ from sklearn.neighbors import KNeighborsClassifier
 
 class KNNClassifier:
     def __init__(self, k: int = 5) -> None:
-        self.k = k
         self._clf = KNeighborsClassifier(
             n_neighbors=k,
             metric="cosine",

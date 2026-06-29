@@ -7,9 +7,9 @@ MAX_SEQ_LENGTH = 512
 
 
 class Encoder:
-    def __init__(self):
+    def __init__(self, model_name_or_path=MODEL_NAME):
         self.model_name = MODEL_NAME
-        self.model = SentenceTransformer(MODEL_NAME)
+        self.model = SentenceTransformer(model_name_or_path)
         self.model.max_seq_length = MAX_SEQ_LENGTH
         self._cache: dict[str, np.ndarray] = {}
 

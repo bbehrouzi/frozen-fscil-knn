@@ -1,3 +1,6 @@
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import argparse
 import json
 import numpy as np
@@ -23,8 +26,9 @@ class Config:
     seeds: list[int]
     n_shots: int
     k_neighbors: int
-    n_novel_classes: int
     base_size: float
+    use_fine_tuned: bool
+    sweep: dict | None = None
 
 
 def run_hp_optimization(dataset_name: str, df: pd.DataFrame, output_dir: Path, cfg: Config):  
@@ -64,53 +68,71 @@ def run_fine_tune(dataset_name: str, df: pd.DataFrame, output_dir: Path, cfg: Co
 
 
 def run_experiment(dataset_name: str, df: pd.DataFrame, output_dir: Path, cfg: Config):
-    all_results = []
+    sweep_var = cfg.sweep["variable"] if cfg.sweep else None
+    sweep_values = cfg.sweep["values"] if cfg.sweep else [None]
+
+    results_by_sweep: dict = {v: [] for v in sweep_values}
 
     for seed in cfg.seeds:
-        encoder_path = output_dir / dataset_name / f"seed_{seed}" / "fine_tuned_encoder"
-        encoder = Encoder()
-        if encoder_path.exists():
-            encoder.load_model(encoder_path)
+        if cfg.use_fine_tuned:
+            encoder_path = output_dir / dataset_name / f"seed_{seed}" / "fine_tuned_encoder"
+            encoder = Encoder(str(encoder_path))
             print(f"[{dataset_name}] seed={seed}: loaded fine-tuned encoder from {encoder_path}")
         else:
-            print(f"[{dataset_name}] seed={seed}: no fine-tuned encoder found, using pre-trained encoder")
+            encoder = Encoder()
+            print(f"[{dataset_name}] seed={seed}: using pre-trained encoder {encoder.model_name}")
 
-        result = experiment(
-            encoder,
-            df,
-            n_shots=cfg.n_shots,
-            k_neighbors=cfg.k_neighbors,
-            n_novel_classes=cfg.n_novel_classes,
-            base_size=cfg.base_size,
-            seed=seed,
-        )
-        all_results.append(result)
+        for sweep_val in sweep_values:
+            exp_kwargs = {
+                "n_shots": cfg.n_shots,
+                "k_neighbors": cfg.k_neighbors,
+                "base_size": cfg.base_size,
+            }
+            if sweep_var is not None:
+                exp_kwargs[sweep_var] = sweep_val
+                seed_dir = output_dir / dataset_name / f"seed_{seed}" / f"{sweep_var}_{sweep_val}"
+            else:
+                seed_dir = output_dir / dataset_name / f"seed_{seed}"
 
-        seed_dir = output_dir / dataset_name / f"seed_{seed}"
-        seed_dir.mkdir(parents=True, exist_ok=True)
-        sessions_df = pd.DataFrame([s.__dict__ for s in result.sessions])
-        sessions_df.to_csv(seed_dir / "eval_sessions.csv", index=False)
-        with open(seed_dir / "eval_summary.json", "w") as f:
-            json.dump({
-                "f_bar": result.f_bar,
-                "perf_drop": result.perf_drop,
-                "silhouette": result.silhouette,
-                "dbi": result.dbi,
-            }, f, indent=2)
-        print(f"[{dataset_name}] seed={seed}: results saved to {seed_dir}")
+            result = experiment(encoder, df, seed=seed, **exp_kwargs)
+            results_by_sweep[sweep_val].append(result)
 
-    # Average scalar metrics across seeds
-    eval_dir = output_dir / dataset_name
-    eval_dir.mkdir(parents=True, exist_ok=True)
-    scalar_keys = ["f_bar", "perf_drop", "silhouette", "dbi"]
-    agg: dict = {"seeds": cfg.seeds}
-    for k in scalar_keys:
-        vals = [getattr(r, k) for r in all_results]
-        agg[f"{k}_mean"] = float(np.mean(vals))
-        agg[f"{k}_std"] = float(np.std(vals))
-    with open(eval_dir / "eval_summary.json", "w") as f:
-        json.dump(agg, f, indent=2)
-    print(f"[{dataset_name}] Aggregate metrics (mean +/- std over {len(cfg.seeds)} seeds): {agg}")
+            seed_dir.mkdir(parents=True, exist_ok=True)
+
+            confusions = [
+                {"session": s.session, "labels": s.confusion_labels, "matrix": s.confusion}
+                for s in result.sessions
+            ]
+            with open(seed_dir / "eval_confusions.json", "w") as f:
+                json.dump(confusions, f, indent=2)
+
+            sessions_data = [
+                {k: v for k, v in s.__dict__.items() if k not in ("confusion", "confusion_labels")}
+                for s in result.sessions
+            ]
+            sessions_df = pd.DataFrame(sessions_data)
+            sessions_df.to_csv(seed_dir / "eval_sessions.csv", index=False)
+            with open(seed_dir / "eval_summary.json", "w") as f:
+                json.dump({"f_bar": result.f_bar, "perf_drop": result.perf_drop}, f, indent=2)
+            print(f"[{dataset_name}] seed={seed} {f'{sweep_var}={sweep_val}' if sweep_var else ''}: saved to {seed_dir}")
+
+    # Average scalar metrics across seeds per sweep value
+    for sweep_val, all_results in results_by_sweep.items():
+        if sweep_var is not None:
+            agg_dir = output_dir / dataset_name / f"{sweep_var}_{sweep_val}"
+        else:
+            agg_dir = output_dir / dataset_name
+        agg_dir.mkdir(parents=True, exist_ok=True)
+        agg: dict = {"seeds": cfg.seeds}
+        if sweep_var is not None:
+            agg[sweep_var] = sweep_val
+        for k in ["f_bar", "perf_drop"]:
+            vals = [getattr(r, k) for r in all_results]
+            agg[f"{k}_mean"] = float(np.mean(vals))
+            agg[f"{k}_std"] = float(np.std(vals))
+        with open(agg_dir / "eval_summary.json", "w") as f:
+            json.dump(agg, f, indent=2)
+        print(f"[{dataset_name}] {f'{sweep_var}={sweep_val} ' if sweep_var else ''}aggregated over {len(cfg.seeds)} seeds: {agg}")
 
 
 def load_hpo_summary(path: Path) -> dict:
@@ -135,8 +157,9 @@ def load_config(path: Path) -> Config:
         seeds=seeds,
         n_shots=data["n_shots"],
         k_neighbors=data["k_neighbors"],
-        n_novel_classes=data["n_novel_classes"],
         base_size=data["base_size"],
+        use_fine_tuned=data["use_fine_tuned"],
+        sweep=data.get("sweep", None),
     )
 
 
