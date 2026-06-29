@@ -57,6 +57,7 @@ def split_train_test(
         n_shots: int = 5,
         random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    assert df[LABEL_COL].nunique() == 1, "split_train_test expects a single-class frame"
     pool = df.sample(n=max_shots, random_state=random_state)
     test_df = df.drop(index=pool.index).reset_index(drop=True)
     train_df = pool.head(n_shots).reset_index(drop=True)

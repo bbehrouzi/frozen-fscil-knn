@@ -81,8 +81,8 @@ def experiment(
         average="macro",
         zero_division=0,
     )
-    sil0 = float(silhouette_score(ref_emb, ref_labels, metric="cosine"))
-    dbi0 = _cosine_dbi(normalize(ref_emb), ref_labels)
+    sil0 = float(silhouette_score(base_test_emb, base_test_labels, metric="cosine"))
+    dbi0 = _cosine_dbi(normalize(base_test_emb), base_test_labels)
     cm0 = confusion_matrix(base_test_labels, base_preds_0, labels=base_classes).tolist()
 
     sessions: list[Session] = [
@@ -118,8 +118,8 @@ def experiment(
         novel_preds = preds[n_base:]
         novel_true = np.concatenate(novel_test_labels)
 
-        silhouette = float(silhouette_score(ref_emb, ref_labels, metric="cosine"))
-        dbi = _cosine_dbi(normalize(ref_emb), ref_labels)
+        silhouette = float(silhouette_score(cumul_test_emb, cumul_test_labels, metric="cosine"))
+        dbi = _cosine_dbi(normalize(cumul_test_emb), cumul_test_labels)
         session_labels = base_classes + seen_novel
         cm = confusion_matrix(cumul_test_labels, preds, labels=session_labels).tolist()
 
