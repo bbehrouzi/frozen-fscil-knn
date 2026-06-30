@@ -6,8 +6,8 @@ from data_prep import LABEL_COL
 
 def split_base_novel(
     df: pd.DataFrame,
-    base_size: float = 0.6,
     random_state: int = 42,
+    base_size: float = 0.6,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     all_classes = df[LABEL_COL].unique()
     n_base_classes = round(len(all_classes) * base_size)
@@ -24,9 +24,9 @@ def split_base_novel(
 
 def split_train_val_test(
     df: pd.DataFrame,
+    random_state: int,
     val_size: float = 0.1,
     test_size: float = 0.2,
-    random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train_val_df, test_df = train_test_split(
         df,
@@ -53,9 +53,9 @@ def split_train_val_test(
 
 def split_train_test(
         df: pd.DataFrame,
-        max_shots: int, 
-        n_shots: int = 5,
-        random_state: int = 42,
+        max_shots: int,
+        random_state: int,
+        n_shots: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     assert df[LABEL_COL].nunique() == 1, "split_train_test expects a single-class frame"
     pool = df.sample(n=max_shots, random_state=random_state)

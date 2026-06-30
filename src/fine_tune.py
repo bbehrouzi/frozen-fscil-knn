@@ -56,8 +56,8 @@ def fine_tune(
 
 def hp_optimization(
     df: pd.DataFrame,
+    seed: int,
     n_trials: int = 15,
-    seed: int = 42,
 ) -> tuple[optuna.Study, list]:
     base_df, _ = split_base_novel(df, random_state=seed)
     base_train_df, base_val_df, _ = split_train_val_test(base_df, random_state=seed)

@@ -1,9 +1,5 @@
-import os
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
 import argparse
 import json
-import numpy as np
 import pandas as pd
 
 from dataclasses import dataclass
@@ -131,13 +127,11 @@ def load_hpo_summary(path: Path) -> dict:
 def load_config(path: Path) -> Config:
     with open(path) as f:
         data = json.load(f)
-    raw = data.get("seeds", data.get("seed", 42))
-    seeds = raw if isinstance(raw, list) else [raw]
     return Config(
         mode=data["mode"],
         data_path=Path(data["data_path"]),
         output_dir=Path(data["output_dir"]),
-        seeds=seeds,
+        seeds=data["seeds"],
         n_shots=data["n_shots"],
         k_neighbors=data["k_neighbors"],
         base_size=data["base_size"],
