@@ -5,7 +5,7 @@ from sklearn.neighbors import NearestCentroid
 
 
 class KNNClassifier:
-    def __init__(self, k: int = 5) -> None:
+    def __init__(self, k: int) -> None:
         self._clf = KNeighborsClassifier(
             n_neighbors=k,
             metric="cosine",

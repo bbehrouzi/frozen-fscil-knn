@@ -1,0 +1,5 @@
+{
+  "mode": "hp-optimization",
+  "data_path": "data/WebOfScience/WOS11967",
+  "seeds": 42
+}

@@ -10,6 +10,8 @@ from data_split import split_base_novel, split_train_val_test
 from encoder import Encoder
 from data_prep import TEXT_COL, LABEL_COL
 
+NUM_HPO_TRIALS = 15
+
 
 def fine_tune(
     encoder: Encoder,
@@ -57,14 +59,14 @@ def fine_tune(
 def hp_optimization(
     df: pd.DataFrame,
     seed: int,
-    n_trials: int = 15,
+    k_neighbors: int,
 ) -> tuple[optuna.Study, list]:
     base_df, _ = split_base_novel(df, random_state=seed)
     base_train_df, base_val_df, _ = split_train_val_test(base_df, random_state=seed)
     base_classes = sorted(base_df[LABEL_COL].unique().tolist())
     
     def objective(trial: optuna.Trial) -> float:
-        print(f"Starting trial {trial.number + 1}/{n_trials}...")
+        print(f"Starting trial {trial.number + 1}/{NUM_HPO_TRIALS}...")
         trial_encoder = Encoder()
 
         fine_tune(
@@ -79,7 +81,7 @@ def hp_optimization(
         train_emb = trial_encoder.embed(base_train_df[TEXT_COL].tolist())
         val_emb = trial_encoder.embed(base_val_df[TEXT_COL].tolist())
 
-        clf = KNNClassifier()
+        clf = KNNClassifier(k_neighbors)
         clf.fit(train_emb, base_train_df[LABEL_COL].to_numpy())
         preds = clf.predict(val_emb)
         score = f1_score(base_val_df[LABEL_COL].to_numpy(), preds, average="macro", zero_division=0)
@@ -88,6 +90,6 @@ def hp_optimization(
 
     sampler = optuna.samplers.TPESampler(seed=seed)
     study = optuna.create_study(direction="maximize", sampler=sampler)
-    study.optimize(objective, n_trials=n_trials)
+    study.optimize(objective, n_trials=NUM_HPO_TRIALS)
 
     return study, base_classes

@@ -13,13 +13,13 @@ class Encoder:
         self.model.max_seq_length = MAX_SEQ_LENGTH
         self._cache: dict[str, np.ndarray] = {}
 
-    def embed(self, texts: list[str], batch_size: int = 64) -> np.ndarray:
+    def embed(self, texts: list[str], batch_size: int = 32) -> np.ndarray:
         missing = [t for t in texts if t not in self._cache]
         if missing:
             embeddings = self.model.encode(
                 missing,
                 batch_size=batch_size,
-                show_progress_bar=False,
+                show_progress_bar=True,
                 convert_to_numpy=True,
             )
             for text, emb in zip(missing, embeddings):

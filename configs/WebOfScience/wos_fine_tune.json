@@ -1,0 +1,5 @@
+{
+  "mode": "fine-tune",
+  "data_path": "data/WebOfScience/WOS11967",
+  "seeds": [664, 4243, 6312, 6891, 8377]
+}

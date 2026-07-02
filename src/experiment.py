@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
+
 from dataclasses import dataclass
+from typing import Callable
 from sklearn.metrics import f1_score, silhouette_score, confusion_matrix
 from sklearn.preprocessing import normalize
 
@@ -10,6 +12,9 @@ from data_prep import TEXT_COL, LABEL_COL
 from data_split import split_base_novel, split_train_test, split_train_val_test
 
 MAX_SHOTS = 10
+N_SHOTS = 5
+K_NEIGHBORS = 5
+BASE_SIZE = 0.6
 
 
 @dataclass
@@ -49,13 +54,13 @@ def _cosine_dbi(X_norm: np.ndarray, labels: np.ndarray) -> float:
     return float(np.mean(db_ratios.max(axis=1)))
 
 
-def experiment(
+def _run_sessions(
     encoder: Encoder,
     df: pd.DataFrame,
-    n_shots: int = 5,
-    k_neighbors: int = 5,
-    base_size: float = 0.6,
-    seed: int = 42,
+    seed: int,
+    n_shots: int,
+    k_neighbors: int,
+    base_size: float,
 ) -> Result:
     base_df, novel_df = split_base_novel(df, base_size=base_size, random_state=seed)
     base_train_df, _, base_test_df = split_train_val_test(base_df, random_state=seed)
@@ -146,3 +151,26 @@ def experiment(
         f_bar=f_bar,
         perf_drop=perf_drop,
     )
+
+
+def experiment(
+    df: pd.DataFrame,
+    get_encoder: Callable[[int], Encoder],
+    seeds: list[int],
+    sweep_vals: list[int],
+    base_size: float = BASE_SIZE,
+) -> dict[str, dict[int, list[Result]]]:
+    results: dict[str, dict[int, list[Result]]] = {
+        "k_neighbors": {val: [] for val in sweep_vals},
+        "n_shots": {val: [] for val in sweep_vals},
+    }
+    for seed in seeds:
+        encoder = get_encoder(seed)
+        for val in sweep_vals:
+            results["k_neighbors"][val].append(
+                _run_sessions(encoder, df, seed, N_SHOTS, val, base_size)
+            )
+            results["n_shots"][val].append(
+                _run_sessions(encoder, df, seed, val, K_NEIGHBORS, base_size)
+            )
+    return results

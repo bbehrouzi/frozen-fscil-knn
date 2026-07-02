@@ -1,0 +1,7 @@
+{
+    "mode": "experiment",
+    "data_path": "data/HumanResources/data_2025_10_26.csv",
+    "seeds": [664, 4243, 6312, 6891, 8377],
+    "sweep_vals": [1, 2, 3, 5, 10],
+    "out_dir": "output/HumanResources/"
+}
